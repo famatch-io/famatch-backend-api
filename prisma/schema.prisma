@@ -1,0 +1,138 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  cognitoSubId String   @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now())
+
+  rooms         Room[]
+  userRooms     UserRoom[]
+  roomRequests  RoomRequest[]
+  ratingsBy     Rating[]           @relation("RatingBy")
+  ratingsTo     Rating[]           @relation("RatingTo")
+  disputes      Dispute[]
+  notifications UserNotification[]
+
+  @@index([createdAt], name: "idx_user_createdat")
+}
+
+model Room {
+  id          Int      @id @default(autoincrement())
+  name        String
+  headCount   Int
+  fee         Float
+  paymentDate DateTime
+  status      String   @default("public")
+  ownerId     Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+
+  owner        User          @relation(fields: [ownerId], references: [id])
+  userRooms    UserRoom[]
+  roomRequests RoomRequest[]
+
+  @@index([ownerId], name: "idx_room_owner")
+  @@index([status], name: "idx_room_status")
+}
+
+model UserRoom {
+  userId    Int
+  roomId    Int
+  role      String   @default("member")
+  joinedAt  DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  room Room @relation(fields: [roomId], references: [id])
+
+  @@id([userId, roomId])
+  @@index([userId, roomId], name: "idx_userroom_user_room")
+}
+
+model RoomRequest {
+  id               Int      @id @default(autoincrement())
+  userId           Int
+  roomId           Int
+  requestTimestamp DateTime
+  status           String   @default("pending")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  room Room @relation(fields: [roomId], references: [id])
+
+  @@index([userId, roomId], name: "idx_roomrequest_user_room")
+  @@index([status], name: "idx_roomrequest_status")
+}
+
+model Rating {
+  id        Int      @id @default(autoincrement())
+  rating    Int
+  comment   String?
+  ratedBy   Int
+  ratedTo   Int
+  disputed  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  rater    User      @relation("RatingBy", fields: [ratedBy], references: [id])
+  ratee    User      @relation("RatingTo", fields: [ratedTo], references: [id])
+  disputes Dispute[]
+
+  @@index([ratedBy, ratedTo], name: "idx_rating_rater_ratee")
+}
+
+model Dispute {
+  id             Int      @id @default(autoincrement())
+  ratingId       Int
+  disputedBy     Int
+  disputeComment String?
+  reviewed       Boolean  @default(false)
+  reviewResult   Boolean?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now())
+
+  rating   Rating @relation(fields: [ratingId], references: [id])
+  disputer User   @relation(fields: [disputedBy], references: [id])
+
+  @@index([ratingId], name: "idx_dispute_rating")
+  @@index([reviewed], name: "idx_dispute_reviewed")
+}
+
+model UserNotification {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  notificationId Int
+  isRead         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id])
+  notification Notification @relation(fields: [notificationId], references: [id])
+
+  @@index([isRead], name: "idx_usernotification_isread")
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  userNotifications UserNotification[]
+
+  @@index([createdAt], name: "idx_notification_createdat")
+}

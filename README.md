@@ -22,15 +22,100 @@
   <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
   [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
-## Description
+# Famatch Backend API
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+The Famatch Backend API is a NestJS-based backend service for the Famatch project. It offers a set of RESTful endpoints to manage users, notifications, and other app functionalities.
 
-## Installation
+## Table of Contents
+
+- [Famatch Backend API](#famatch-backend-api)
+  - [Table of Contents](#table-of-contents)
+  - [Requirements](#requirements)
+  - [Getting Started](#getting-started)
+  - [Development Workflow](#development-workflow)
+  - [License](#license)
+  - [Running the app](#running-the-app)
+  - [Test](#test)
+  - [Support](#support)
+  - [Stay in touch](#stay-in-touch)
+  - [License](#license-1)
+
+## Requirements
+
+- [Node.js](https://nodejs.org/)
+- [Yarn](https://classic.yarnpkg.com/)
+- [Docker](https://www.docker.com/)
+
+## Getting Started
+
+To clone and set up the project, follow these steps:
+
+1. Clone the repository:
 
 ```bash
-$ yarn install
+
+git clone https://github.com/username/famatch-backend-api.git
+cd famatch-backend-api
+
 ```
+
+2. Install the dependencies:
+
+```
+
+yarn
+
+```
+
+## Development Workflow
+
+Follow these steps to start the development environment:
+
+1. Make sure Docker is running and start the local PostgreSQL instance:
+
+```
+
+yarn db:start
+
+```
+
+2. Apply the database migrations:
+
+```
+
+yarn prisma:migrate
+
+```
+
+3. Generate the Prisma schema and Prisma client:
+
+```
+
+yarn prisma:generate
+
+```
+
+4. Start the NestJS development server:
+
+```
+
+yarn start:dev
+
+```
+
+5. (Optional) Start Prisma Studio for exploring and debugging the PostgreSQL database data:
+
+```
+
+yarn prisma:studio
+
+```
+
+The NestJS development server should now be running alongside a PostgreSQL instance, with Prisma Client available to interact with the database. You can begin developing new features or fixing bugs in the codebase using this environment.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
 
 ## Running the app
 
