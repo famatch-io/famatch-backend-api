@@ -1,6 +1,6 @@
 import { Controller, Get, Post } from '@nestjs/common';
-import { AppService } from './app.service';
 import { Notification } from '@prisma/client';
+import { AppService } from './app.service';
 
 @Controller()
 export class AppController {
