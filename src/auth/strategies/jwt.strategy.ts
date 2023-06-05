@@ -6,6 +6,7 @@ import * as jwksRsa from 'jwks-rsa';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { UserService } from '../../user/user.service';
 import { CognitoService } from '../cognito/cognito.service';
+import { AWSCognitoPayload } from '../models/AwsCognitoPayload';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -47,7 +48,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     }
   }
 
-  async validate(payload: any) {
+  async validate(payload: AWSCognitoPayload) {
     const user = await this.userService.getUserByCognitoId(payload.sub);
     if (!user) {
       throw new NotFoundException('User not found in app');
