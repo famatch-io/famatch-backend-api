@@ -26,9 +26,7 @@ export class AuthService {
       }
 
       if (!AuthenticationResult)
-        throw new UnauthorizedException(
-          'Error, failed to get AuthenticationResult',
-        );
+        throw new Error('Error, failed to get AuthenticationResult');
 
       return {
         accessToken: AuthenticationResult.AccessToken,
