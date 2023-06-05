@@ -16,6 +16,7 @@ export class AuthService {
     try {
       const response = await this.cognitoService.initiateAuth(email, password);
 
+      // * user first time login will require reset password
       if (response.ChallengeName === ChallengeNameType.NEW_PASSWORD_REQUIRED) {
         return {
           challengeName: response.ChallengeName,
