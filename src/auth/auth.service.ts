@@ -14,21 +14,26 @@ export class AuthService {
 
   async login(email: string, password: string) {
     try {
-      const response = await this.cognitoService.initiateAuth(email, password);
+      const { ChallengeName, AuthenticationResult, Session } =
+        await this.cognitoService.initiateAuth(email, password);
 
       // * user first time login will require reset password
-      if (response.ChallengeName === ChallengeNameType.NEW_PASSWORD_REQUIRED) {
+      if (ChallengeName === ChallengeNameType.NEW_PASSWORD_REQUIRED) {
         return {
-          challengeName: response.ChallengeName,
-          session: response.Session,
+          challengeName: ChallengeName,
+          session: Session,
         };
       }
 
-      const { AuthenticationResult } = response;
+      if (!AuthenticationResult)
+        throw new UnauthorizedException(
+          'Error, failed to get AuthenticationResult',
+        );
+
       return {
-        accessToken: AuthenticationResult?.AccessToken,
-        idToken: AuthenticationResult?.IdToken,
-        refreshToken: AuthenticationResult?.RefreshToken,
+        accessToken: AuthenticationResult.AccessToken,
+        idToken: AuthenticationResult.IdToken,
+        refreshToken: AuthenticationResult.RefreshToken,
       };
     } catch (error) {
       console.error(error);
