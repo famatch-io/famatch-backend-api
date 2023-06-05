@@ -50,11 +50,15 @@ export class AuthService {
         newPassword,
         session,
       );
+
       const { AuthenticationResult } = response;
+      if (!AuthenticationResult)
+        throw new Error('Error, failed to get AuthenticationResult');
+
       return {
-        accessToken: AuthenticationResult?.AccessToken,
-        idToken: AuthenticationResult?.IdToken,
-        refreshToken: AuthenticationResult?.RefreshToken,
+        accessToken: AuthenticationResult.AccessToken,
+        idToken: AuthenticationResult.IdToken,
+        refreshToken: AuthenticationResult.RefreshToken,
       };
     } catch (error) {
       console.error(error);
