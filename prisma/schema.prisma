@@ -11,128 +11,167 @@ datasource db {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  cognitoSubId String   @unique
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @default(now())
-
-  rooms         Room[]
-  userRooms     UserRoom[]
-  roomRequests  RoomRequest[]
-  ratingsBy     Rating[]           @relation("RatingBy")
-  ratingsTo     Rating[]           @relation("RatingTo")
-  disputes      Dispute[]
-  notifications UserNotification[]
-
-  @@index([createdAt], name: "idx_user_createdat")
+  id            Int                @id @default(autoincrement())
+  username      String
+  cognitoSubId  String             @unique
+  orgs          UserOrginization[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  notifications Notification[]
+  // subscriptions UserSubscription[]
+  repos         Repository[]
 }
 
-model Room {
-  id          Int      @id @default(autoincrement())
-  name        String
-  headCount   Int
-  fee         Float
-  paymentDate DateTime
-  status      String   @default("public")
-  ownerId     Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now())
+model Orginization {
+  id        Int                @id @default(autoincrement())
+  name      String
+  spaces    Space[]
+  userOrgs  UserOrginization[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
 
-  owner        User          @relation(fields: [ownerId], references: [id])
-  userRooms    UserRoom[]
-  roomRequests RoomRequest[]
-
-  @@index([ownerId], name: "idx_room_owner")
-  @@index([status], name: "idx_room_status")
+  @@index([name], name: "orginization_index")
 }
 
-model UserRoom {
+model Space {
+  id        Int          @id @default(autoincrement())
+  name      String
+  orgId     Int
+  org       Orginization @relation(fields: [orgId], references: [id])
+  repos     Repository[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([name, orgId], name: "space_index")
+}
+
+model Repository {
+  id         Int      @id @default(autoincrement())
+  name       String
+  spaceId    Int
+  space      Space    @relation(fields: [spaceId], references: [id])
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id])
+  uploadDate DateTime
+  path       String
+  // * text, image, etc...
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([name, spaceId], name: "repository_index")
+}
+
+model Role {
+  id        Int                @id @default(autoincrement())
+  name      String
+  userOrg   UserOrginization[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+}
+
+model UserOrginization {
+  id        Int          @id @default(autoincrement())
   userId    Int
-  roomId    Int
-  role      String   @default("member")
-  joinedAt  DateTime
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
+  user      User         @relation(fields: [userId], references: [id])
+  orgId     Int
+  org       Orginization @relation(fields: [orgId], references: [id])
+  roleId    Int
+  role      Role         @relation(fields: [roleId], references: [id])
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
-  user User @relation(fields: [userId], references: [id])
-  room Room @relation(fields: [roomId], references: [id])
-
-  @@id([userId, roomId])
-  @@index([userId, roomId], name: "idx_userroom_user_room")
+  @@index([userId, orgId, roleId], name: "userOrginization_index")
 }
 
-model RoomRequest {
-  id               Int      @id @default(autoincrement())
-  userId           Int
-  roomId           Int
-  requestTimestamp DateTime
-  status           String   @default("pending")
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-  room Room @relation(fields: [roomId], references: [id])
-
-  @@index([userId, roomId], name: "idx_roomrequest_user_room")
-  @@index([status], name: "idx_roomrequest_status")
-}
-
-model Rating {
-  id        Int      @id @default(autoincrement())
-  rating    Int
-  comment   String?
-  ratedBy   Int
-  ratedTo   Int
-  disputed  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
-
-  rater    User      @relation("RatingBy", fields: [ratedBy], references: [id])
-  ratee    User      @relation("RatingTo", fields: [ratedTo], references: [id])
-  disputes Dispute[]
-
-  @@index([ratedBy, ratedTo], name: "idx_rating_rater_ratee")
-}
-
-model Dispute {
-  id             Int      @id @default(autoincrement())
-  ratingId       Int
-  disputedBy     Int
-  disputeComment String?
-  reviewed       Boolean  @default(false)
-  reviewResult   Boolean?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @default(now())
-
-  rating   Rating @relation(fields: [ratingId], references: [id])
-  disputer User   @relation(fields: [disputedBy], references: [id])
-
-  @@index([ratingId], name: "idx_dispute_rating")
-  @@index([reviewed], name: "idx_dispute_reviewed")
-}
-
-model UserNotification {
-  id             Int      @id @default(autoincrement())
-  userId         Int
-  notificationId Int
-  isRead         Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @default(now())
-
-  user         User         @relation(fields: [userId], references: [id])
-  notification Notification @relation(fields: [notificationId], references: [id])
-
-  @@index([isRead], name: "idx_usernotification_isread")
+model NotificationType {
+  id            Int            @id @default(autoincrement())
+  name          String
+  notifications Notification[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model Notification {
-  id        Int      @id @default(autoincrement())
-  title     String
-  content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
+  id                 Int              @id @default(autoincrement())
+  userId             Int
+  user               User             @relation(fields: [userId], references: [id])
+  notificationTypeId Int
+  notificationType   NotificationType @relation(fields: [notificationTypeId], references: [id])
+  message            String
+  readStatus         String
+  notificationDate   DateTime
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
-  userNotifications UserNotification[]
-
-  @@index([createdAt], name: "idx_notification_createdat")
+  @@index([userId, notificationTypeId], name: "notification_index")
 }
+
+// model SubscriptionTier {
+//   id             Int                @id @default(autoincrement())
+//   name           String
+//   price          Float?
+//   subscriptions  UserSubscription[]
+//   activityLimits ActivityLimit[]
+//   createdAt      DateTime           @default(now())
+//   updatedAt      DateTime           @updatedAt
+// }
+
+// model UserSubscription {
+//   id            Int              @id @default(autoincrement())
+//   userId        Int
+//   user          User             @relation(fields: [userId], references: [id])
+//   tierId        Int
+//   tier          SubscriptionTier @relation(fields: [tierId], references: [id])
+//   startDate     DateTime
+//   endDate       DateTime?
+//   billing       Billing[]
+//   createdAt     DateTime         @default(now())
+//   updatedAt     DateTime         @updatedAt
+//   OverageCharge OverageCharge[]
+
+//   @@index([userId, tierId], name: "subscription_index")
+// }
+
+// model ActivityType {
+//   id            Int             @id @default(autoincrement())
+//   name          String
+//   activityLimit ActivityLimit[]
+//   createdAt     DateTime        @default(now())
+//   updatedAt     DateTime        @updatedAt
+// }
+
+// model ActivityLimit {
+//   id             Int              @id @default(autoincrement())
+//   tierId         Int
+//   tier           SubscriptionTier @relation(fields: [tierId], references: [id])
+//   activityTypeId Int
+//   activityType   ActivityType     @relation(fields: [activityTypeId], references: [id])
+//   limit          Int
+//   createdAt      DateTime         @default(now())
+//   updatedAt      DateTime         @updatedAt
+
+//   @@index([tierId, activityTypeId], name: "activity_limit_index")
+// }
+
+// model Billing {
+//   id             Int              @id @default(autoincrement())
+//   subscriptionId Int
+//   subscription   UserSubscription @relation(fields: [subscriptionId], references: [id])
+//   billingDate    DateTime
+//   amountDue      Float
+//   dueDate        DateTime
+//   paidDate       DateTime?
+//   createdAt      DateTime         @default(now())
+//   updatedAt      DateTime         @updatedAt
+// }
+
+// model OverageCharge {
+//   id             Int              @id @default(autoincrement())
+//   subscriptionId Int
+//   subscription   UserSubscription @relation(fields: [subscriptionId], references: [id])
+//   overageAmount  Int
+//   charge         Float
+//   chargeDate     DateTime
+//   createdAt      DateTime         @default(now())
+//   updatedAt      DateTime         @updatedAt
+// }
