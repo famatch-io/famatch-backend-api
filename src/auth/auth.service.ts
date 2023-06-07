@@ -39,6 +39,20 @@ export class AuthService {
     }
   }
 
+  async signUp(email: string, password: string) {
+    try {
+      const response = await this.cognitoService.signUp(email, password);
+      return {
+        message: 'User signed up successfully.',
+        userSub: response.UserSub,
+      };
+    } catch (error) {
+      console.error(error);
+      // Customize error handling as needed
+      throw new BadRequestException('Unable to sign up.');
+    }
+  }
+
   async respondToAuthChallenge(
     email: string,
     newPassword: string,

@@ -5,6 +5,7 @@ import {
   ChallengeNameType,
   CognitoIdentityProvider,
   RespondToAuthChallengeCommandInput,
+  SignUpCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -66,20 +67,36 @@ export class CognitoService {
         NEW_PASSWORD: newPassword,
         SECRET_HASH: secretHash,
         // TODO refactor this to be dynamic, and make it optional in AWS user pool
-        'userAttributes.gender': 'male', // The gender attribute and its value
-        'userAttributes.profile': 'male', // The gender attribute and its value
-        'userAttributes.picture': 'male', // The gender attribute and its value
-        'userAttributes.name': 'male', // The gender attribute and its value
-        'userAttributes.phone_number': '+85264443303', // The gender attribute and its value
-        'userAttributes.given_name': 'male', // The gender attribute and its value
-        'userAttributes.family_name': 'male', // The gender attribute and its value
+        'userAttributes.gender': 'Male', // The user's gender (male, female, or other)
+        'userAttributes.profile': 'Programmer Online', // A brief description of the user (max 500 characters)
+        'userAttributes.picture': 'https://example.com/picture.jpg', // The URL of the user's profile picture (must be an image file)
+        'userAttributes.name': 'John Doe', // The user's full name
+        'userAttributes.phone_number': '+85212345678', // A fake phone number that cannot be called
+        'userAttributes.given_name': 'John', // The user's first name
+        'userAttributes.family_name': 'Doe', // The user's last name
       },
       Session: session,
     };
 
     return await this.cognito.respondToAuthChallenge(params);
   }
+  async signUp(email: string, password: string) {
+    const secretHash = this.createSecretHash(email);
+    const params = {
+      ClientId: this.clientId,
+      Username: email,
+      Password: password,
+      SecretHash: secretHash,
+    };
 
+    try {
+      const response = await this.cognito.send(new SignUpCommand(params));
+      return response;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  }
   getJwksUri() {
     return `https://cognito-idp.${this.region}.amazonaws.com/${this.userPoolId}/.well-known/jwks.json`;
   }
