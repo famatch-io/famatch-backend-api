@@ -1,6 +1,10 @@
 import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class SignUpDto {
+  @IsNotEmpty()
+  @IsString()
+  username: string;
+
   @IsEmail()
   email: string;
 

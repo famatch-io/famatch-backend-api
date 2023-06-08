@@ -41,10 +41,20 @@ export class AuthService {
 
   async signUp(signUpDto: SignUpDto) {
     try {
-      const response = await this.cognitoService.signUp(signUpDto);
+      if (!signUpDto.username) {
+        throw new BadRequestException('Username is required.');
+      }
+      const response = await this.cognitoService.signUp({
+        username: signUpDto.username,
+        email: signUpDto.email,
+        password: signUpDto.password,
+      });
+      const userSub = response.UserSub;
+      const username = signUpDto.username;
       return {
         message: 'User signed up successfully.',
-        userSub: response.UserSub,
+        userSub,
+        username, // Include the username field in the response object
       };
     } catch (error) {
       console.error(error);

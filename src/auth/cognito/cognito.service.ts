@@ -93,15 +93,16 @@ export class CognitoService {
       },
     ];
 
+    const clientId = process.env.AWS_COGNITO_CLIENT_ID;
     const clientSecret = process.env.AWS_COGNITO_CLIENT_SECRET;
-    const message = signUpDto.email + this.clientId;
+    const message = signUpDto.email + clientId;
     const hash = createHmac('SHA256', clientSecret)
       .update(message)
       .digest('base64');
 
     const params = {
-      ClientId: this.clientId,
-      Username: signUpDto.email,
+      ClientId: clientId,
+      Username: signUpDto.username,
       Password: signUpDto.password,
       UserAttributes: userAttributes,
       ValidationData: [
@@ -111,9 +112,9 @@ export class CognitoService {
         },
       ],
       ClientMetadata: {
-        client_id: this.clientId,
+        client_id: clientId,
       },
-      SecretHash: hash, // Add the SECRET_HASH value to the params object
+      SecretHash: hash,
     };
 
     try {
