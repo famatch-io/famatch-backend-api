@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { CognitoService } from './cognito/cognito.service';
-
+import { SignUpDto } from './dto/signup.dto';
 @Injectable()
 export class AuthService {
   constructor(private cognitoService: CognitoService) {}
@@ -39,9 +39,9 @@ export class AuthService {
     }
   }
 
-  async signUp(email: string, password: string) {
+  async signUp(signUpDto: SignUpDto) {
     try {
-      const response = await this.cognitoService.signUp(email, password);
+      const response = await this.cognitoService.signUp(signUpDto);
       return {
         message: 'User signed up successfully.',
         userSub: response.UserSub,

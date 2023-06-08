@@ -14,10 +14,9 @@ export class AuthController {
     return this.authService.login(loginDto.email, loginDto.password);
   }
 
-  // Add this route handler to the AuthController class
   @Post('signup')
   signUp(@Body() signUpDto: SignUpDto) {
-    return this.authService.signUp(signUpDto.email, signUpDto.password);
+    return this.authService.signUp(signUpDto);
   }
 
   @Post('respond-to-new-password-required')

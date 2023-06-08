@@ -1,5 +1,4 @@
 // src/auth/cognito/cognito.service.ts
-
 import {
   AuthFlowType,
   ChallengeNameType,
@@ -7,9 +6,14 @@ import {
   RespondToAuthChallengeCommandInput,
   SignUpCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
-import { Injectable } from '@nestjs/common';
+import {
+  UnauthorizedException,
+  BadRequestException,
+  Injectable,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'crypto';
+import { SignUpDto } from './../dto/signup.dto';
 
 @Injectable()
 export class CognitoService {
@@ -80,23 +84,54 @@ export class CognitoService {
 
     return await this.cognito.respondToAuthChallenge(params);
   }
-  async signUp(email: string, password: string) {
-    const secretHash = this.createSecretHash(email);
+
+  async signUp(signUpDto: SignUpDto) {
+    const userAttributes = [
+      {
+        Name: 'email',
+        Value: signUpDto.email,
+      },
+    ];
+
+    const clientSecret = process.env.AWS_COGNITO_CLIENT_SECRET;
+    const message = signUpDto.email + this.clientId;
+    const hash = createHmac('SHA256', clientSecret)
+      .update(message)
+      .digest('base64');
+
     const params = {
       ClientId: this.clientId,
-      Username: email,
-      Password: password,
-      SecretHash: secretHash,
+      Username: signUpDto.email,
+      Password: signUpDto.password,
+      UserAttributes: userAttributes,
+      ValidationData: [
+        {
+          Name: 'email',
+          Value: signUpDto.email,
+        },
+      ],
+      ClientMetadata: {
+        client_id: this.clientId,
+      },
+      SecretHash: hash, // Add the SECRET_HASH value to the params object
     };
 
     try {
-      const response = await this.cognito.send(new SignUpCommand(params));
-      return response;
+      const response = await this.cognito.signUp(params);
+      const authResponse = await this.initiateAuth(
+        signUpDto.email,
+        signUpDto.password,
+      );
+      return {
+        ...response,
+        ...authResponse,
+      };
     } catch (error) {
       console.error(error);
-      throw error;
+      throw new BadRequestException(error.message);
     }
   }
+
   getJwksUri() {
     return `https://cognito-idp.${this.region}.amazonaws.com/${this.userPoolId}/.well-known/jwks.json`;
   }
