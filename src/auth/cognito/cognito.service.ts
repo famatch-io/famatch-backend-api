@@ -5,6 +5,7 @@ import {
   CognitoIdentityProvider,
   RespondToAuthChallengeCommandInput,
   SignUpCommand,
+  SignUpCommandInput,
 } from '@aws-sdk/client-cognito-identity-provider';
 import {
   UnauthorizedException,
@@ -86,53 +87,37 @@ export class CognitoService {
   }
 
   async signUp(signUpDto: SignUpDto) {
-    const userAttributes = [
-      {
-        Name: 'email',
-        Value: signUpDto.email,
-      },
-    ];
-
-    const clientId = process.env.AWS_COGNITO_CLIENT_ID;
-    const clientSecret = process.env.AWS_COGNITO_CLIENT_SECRET;
-    const message = signUpDto.email + clientId;
-    const hash = createHmac('SHA256', clientSecret)
-      .update(message)
-      .digest('base64');
-
-    const params = {
-      ClientId: clientId,
-      Username: signUpDto.username,
+    const secretHash = this.createSecretHash(signUpDto.username);
+    const params: SignUpCommandInput = {
+      ClientId: this.clientId,
       Password: signUpDto.password,
-      UserAttributes: userAttributes,
+      Username: signUpDto.username,
       ValidationData: [
         {
           Name: 'email',
           Value: signUpDto.email,
         },
       ],
-      ClientMetadata: {
-        client_id: clientId,
-      },
-      SecretHash: hash,
+
+      SecretHash: secretHash,
+      UserAttributes: [
+        { Name: 'name', Value: 'John Doe' },
+        { Name: 'given_name', Value: 'John' },
+        { Name: 'family_name', Value: 'Doe' },
+        { Name: 'profile', Value: 'http://example.com/profile' },
+        { Name: 'picture', Value: 'http://example.com/picture' },
+        { Name: 'email', Value: signUpDto.email },
+        { Name: 'gender', Value: 'male' },
+        { Name: 'birthdate', Value: '1970-01-01' },
+        { Name: 'phone_number', Value: '+1234567890' },
+      ],
     };
 
-    try {
-      const response = await this.cognito.signUp(params);
-      const authResponse = await this.initiateAuth(
-        signUpDto.email,
-        signUpDto.password,
-      );
-      return {
-        ...response,
-        ...authResponse,
-      };
-    } catch (error) {
-      console.error(error);
-      throw new BadRequestException(error.message);
-    }
-  }
+    const command = new SignUpCommand(params);
+    const response = await this.cognito.send(command);
 
+    return response;
+  }
   getJwksUri() {
     return `https://cognito-idp.${this.region}.amazonaws.com/${this.userPoolId}/.well-known/jwks.json`;
   }
