@@ -38,7 +38,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
   }
-
+  // src/auth/auth.service.ts
   async signUp(signUpDto: SignUpDto) {
     try {
       if (!signUpDto.username) {
@@ -49,7 +49,7 @@ export class AuthService {
         email: signUpDto.email,
         password: signUpDto.password,
       });
-      const userSub = response.UserSub;
+      const userSub = response;
       const username = signUpDto.username;
       return {
         message: 'User signed up successfully.',

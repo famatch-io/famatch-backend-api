@@ -1,11 +1,19 @@
 // src/auth/cognito/cognito.service.ts
 import {
+  AdminConfirmSignUpCommand,
+  AdminConfirmSignUpCommandInput,
   AuthFlowType,
   ChallengeNameType,
   CognitoIdentityProvider,
+  CognitoIdentityProviderClient,
+  ConfirmSignUpCommand,
+  ConfirmSignUpCommandInput,
+  InvalidPasswordException,
+  ResendConfirmationCodeCommand,
   RespondToAuthChallengeCommandInput,
   SignUpCommand,
   SignUpCommandInput,
+  UsernameExistsException,
 } from '@aws-sdk/client-cognito-identity-provider';
 import {
   UnauthorizedException,
@@ -34,6 +42,10 @@ export class CognitoService {
 
     this.cognito = new CognitoIdentityProvider({
       region: this.region,
+      credentials: {
+        accessKeyId: this.configService.get('AWS_COGNITO_IAM_KEY'),
+        secretAccessKey: this.configService.get('AWS_COGNITO_IAM_SECRET'),
+      },
     });
   }
 
@@ -98,7 +110,6 @@ export class CognitoService {
           Value: signUpDto.email,
         },
       ],
-
       SecretHash: secretHash,
       UserAttributes: [
         { Name: 'name', Value: 'John Doe' },
@@ -113,11 +124,62 @@ export class CognitoService {
       ],
     };
 
-    const command = new SignUpCommand(params);
-    const response = await this.cognito.send(command);
+    let signUpResponse = null;
+    let signUpError = null;
+    try {
+      const signUpCommand = new SignUpCommand(params);
+      signUpResponse = await this.cognito.send(signUpCommand);
+    } catch (error) {
+      if (error instanceof UsernameExistsException) {
+        // Handle the case where the username already exists
+        signUpError = { message: 'Username already exists' };
+      } else if (error instanceof InvalidPasswordException) {
+        // Handle the case where the password is invalid
+        signUpError = { message: 'Invalid password' };
+      } else {
+        // Handle all other errors
+        signUpError = { message: 'Error occurred during sign-up' };
+      }
+    }
 
-    return response;
+    //Confirm the sign-up for the user
+
+    const params1: AdminConfirmSignUpCommandInput = {
+      UserPoolId: this.userPoolId,
+      Username: signUpDto.username,
+    };
+    const command = new AdminConfirmSignUpCommand(params1);
+    const confirmResponse = await this.cognito.send(command);
+
+    const reparams = {
+      ClientId: this.clientId,
+      Username: signUpDto.username,
+      SecretHash: secretHash,
+    };
+
+    // Resend the confirmation code
+    const resendConfirmationCodeCommand = new ResendConfirmationCodeCommand(
+      reparams,
+    );
+
+    try {
+      const resendConfirmationCodeResponse = await this.cognito.send(
+        resendConfirmationCodeCommand,
+      );
+      console.log(
+        'Confirmation code resent successfully:',
+        resendConfirmationCodeResponse,
+      );
+    } catch (err) {
+      console.error('Error resending confirmation code:', err);
+    }
+
+    return {
+      ...(signUpResponse !== null && { signUpResponse }),
+      confirmResponse: confirmResponse,
+    };
   }
+
   getJwksUri() {
     return `https://cognito-idp.${this.region}.amazonaws.com/${this.userPoolId}/.well-known/jwks.json`;
   }
