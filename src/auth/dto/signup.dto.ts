@@ -18,7 +18,6 @@ export class SignUpDto {
   @IsString()
   password: string;
 
-  @IsOptional()
   @IsString()
   @IsPhoneNumber('HK')
   phone_number: string;

@@ -7,17 +7,16 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { CognitoService } from './cognito/cognito.service';
-import { ConfirmOTPDto } from './dto/confirm-otp.dto';
-import { ConfirmSignUpDto } from './dto/confirm-sign-up.dto';
+import { ConfirmSignUpDto } from './dto/otp.dto';
 import { SignUpDto } from './dto/signup.dto';
 @Injectable()
 export class AuthService {
   constructor(private cognitoService: CognitoService) {}
 
-  async login(email: string, password: string) {
+  async login(username: string, password: string) {
     try {
       const { ChallengeName, AuthenticationResult, Session } =
-        await this.cognitoService.initiateAuth(email, password);
+        await this.cognitoService.initiateAuth(username, password);
 
       // * user first time login will require reset password
       if (ChallengeName === ChallengeNameType.NEW_PASSWORD_REQUIRED) {
@@ -62,21 +61,34 @@ export class AuthService {
     }
   }
 
-  async confirmSMS(payload: ConfirmOTPDto) {
+  async confirmSmsSignUp(confirmSignUpDto: ConfirmSignUpDto) {
     try {
-      const response = await this.cognitoService.confirmSMS(payload);
-      return response;
+      return await this.cognitoService.confirmSignUp(confirmSignUpDto);
     } catch (error) {
       console.error(error);
       throw new BadRequestException('Unable to confirm phone number.');
     }
   }
-  async confirmSMSSignUp(payload: ConfirmSignUpDto) {
+
+  async sendEmailVerificationCode(accessToken: string) {
     try {
-      return await this.cognitoService.confirmSignUp(payload);
+      return await this.cognitoService.sendEmailVerificationCode(accessToken);
     } catch (error) {
       console.error(error);
-      throw new BadRequestException('Unable to confirm phone number.');
+      throw new BadRequestException('Unable to send email verification code.');
+    }
+  }
+
+  async confirmEmail(accessToken: string, code: string) {
+    try {
+      return await this.cognitoService.verifyUserAttribute({
+        AccessToken: accessToken,
+        AttributeName: 'email',
+        Code: code,
+      });
+    } catch (error) {
+      console.error(error);
+      throw new BadRequestException('Unable to confirm confirm email.');
     }
   }
 

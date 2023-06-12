@@ -4,18 +4,19 @@ import {
   ChallengeNameType,
   CognitoIdentityProvider,
   ConfirmSignUpCommand,
+  GetUserAttributeVerificationCodeCommand,
   ResendConfirmationCodeCommand,
   RespondToAuthChallengeCommandInput,
   SignUpCommand,
   SignUpCommandInput,
   SignUpCommandOutput,
   VerifyUserAttributeCommand,
+  VerifyUserAttributeCommandInput,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'crypto';
-import { ConfirmOTPDto } from '../dto/confirm-otp.dto';
-import { ConfirmSignUpDto } from '../dto/confirm-sign-up.dto';
+import { ConfirmSignUpDto } from '../dto/otp.dto';
 import { SignUpDto } from './../dto/signup.dto';
 
 @Injectable()
@@ -77,14 +78,13 @@ export class CognitoService {
         USERNAME: email,
         NEW_PASSWORD: newPassword,
         SECRET_HASH: secretHash,
-        // TODO refactor this to be dynamic, and make it optional in AWS user pool
-        'userAttributes.gender': 'Male', // The user's gender (male, female, or other)
-        'userAttributes.profile': 'Programmer Online', // A brief description of the user (max 500 characters)
-        'userAttributes.picture': 'https://example.com/picture.jpg', // The URL of the user's profile picture (must be an image file)
-        'userAttributes.name': 'John Doe', // The user's full name
+        'userAttributes.gender': '', // The user's gender (male, female, or other)
+        'userAttributes.profile': '', // A brief description of the user (max 500 characters)
+        'userAttributes.picture': '', // The URL of the user's profile picture (must be an image file)
+        'userAttributes.name': '', // The user's full name
         'userAttributes.phone_number': '+85212345678', // A fake phone number that cannot be called
-        'userAttributes.given_name': 'John', // The user's first name
-        'userAttributes.family_name': 'Doe', // The user's last name
+        'userAttributes.given_name': '', // The user's first name
+        'userAttributes.family_name': '', // The user's last name
       },
       Session: session,
     };
@@ -117,6 +117,14 @@ export class CognitoService {
     return signUpResponse;
   }
 
+  async sendEmailVerificationCode(accessToken: string) {
+    const command = new GetUserAttributeVerificationCodeCommand({
+      AccessToken: accessToken,
+      AttributeName: 'email',
+    });
+    return this.cognito.send(command);
+  }
+
   async sendSMS(username: string) {
     // Resend the confirmation code
     const response = await this.cognito.send(
@@ -129,16 +137,6 @@ export class CognitoService {
     return response;
   }
 
-  async confirmSMS({ accessToken, code }: ConfirmOTPDto) {
-    const command = new VerifyUserAttributeCommand({
-      AccessToken: accessToken,
-      AttributeName: 'phone_number',
-      Code: code,
-    });
-    const confirmResponse = await this.cognito.send(command);
-    return confirmResponse;
-  }
-
   async confirmSignUp({ username, code }: ConfirmSignUpDto) {
     const command = new ConfirmSignUpCommand({
       ClientId: this.clientId,
@@ -146,6 +144,12 @@ export class CognitoService {
       Username: username,
       SecretHash: this.createSecretHash(username),
     });
+    const confirmResponse = await this.cognito.send(command);
+    return confirmResponse;
+  }
+
+  async verifyUserAttribute(input: VerifyUserAttributeCommandInput) {
+    const command = new VerifyUserAttributeCommand(input);
     const confirmResponse = await this.cognito.send(command);
     return confirmResponse;
   }

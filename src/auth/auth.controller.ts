@@ -1,19 +1,23 @@
 // src/auth/auth.controller.ts
 
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { ConfirmSignUpDto } from './dto/confirm-sign-up.dto';
 import { LoginDto } from './dto/login.dto';
 import { NewPasswordDto } from './dto/new-password.dto';
+import { CodeDto, ConfirmSignUpDto } from './dto/otp.dto';
 import { SignUpDto } from './dto/signup.dto';
+import { GetAccessToken } from './get-jwt.decorator';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
+@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('login')
   login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto.email, loginDto.password);
+    return this.authService.login(loginDto.username, loginDto.password);
   }
 
   @Post('signup')
@@ -26,9 +30,24 @@ export class AuthController {
     return this.authService.sendSMS(username);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Post('send-verification-email')
+  async sendEmailVerificationCode(@GetAccessToken() accessToken: string) {
+    return this.authService.sendEmailVerificationCode(accessToken);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('confirm-email')
+  async confirmEmail(
+    @GetAccessToken() accessToken: string,
+    @Body() { code }: CodeDto,
+  ) {
+    return this.authService.confirmEmail(accessToken, code);
+  }
+
   @Post('confirm-sms-signup')
   async confirmSmsSignUp(@Body() confirmSignUpDto: ConfirmSignUpDto) {
-    return this.authService.confirmSMSSignUp(confirmSignUpDto);
+    return this.authService.confirmSmsSignUp(confirmSignUpDto);
   }
 
   @Post('respond-to-new-password-required')
