@@ -19,6 +19,19 @@ export class AuthController {
     return this.authService.signUp(signUpDto);
   }
 
+  @Post('send-sms')
+  async sendSMS(@Body('username') username: string) {
+    return this.authService.sendSMS(username);
+  }
+
+  @Post('confirm-sms')
+  async confirmSMS(
+    @Body('accessToken') accessToken: string,
+    @Body('confirmationCode') confirmationCode: string,
+  ) {
+    return this.authService.confirmSMS(accessToken, confirmationCode);
+  }
+
   @Post('respond-to-new-password-required')
   respondToNewPasswordRequired(@Body() newPasswordDto: NewPasswordDto) {
     return this.authService.respondToAuthChallenge(

@@ -38,7 +38,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
   }
-  // src/auth/auth.service.ts
+
   async signUp(signUpDto: SignUpDto) {
     try {
       if (!signUpDto.username) {
@@ -60,6 +60,35 @@ export class AuthService {
       console.error(error);
       // Customize error handling as needed
       throw new BadRequestException('Unable to sign up.');
+    }
+  }
+
+  async sendSMS(username: string) {
+    try {
+      const response = await this.cognitoService.sendSMS(username);
+      return {
+        message: 'sendSMS successfully.',
+        response,
+      };
+    } catch (error) {
+      console.error(error);
+      throw new BadRequestException('Unable to sendSMS.');
+    }
+  }
+
+  async confirmSMS(accessToken: string, confirmationCode: string) {
+    try {
+      const response = await this.cognitoService.confirmSMS(
+        accessToken,
+        confirmationCode,
+      );
+      return {
+        message: 'Phone number confirmed successfully.',
+        response,
+      };
+    } catch (error) {
+      console.error(error);
+      throw new BadRequestException('Unable to confirm phone number.');
     }
   }
 

@@ -5,21 +5,15 @@ import {
   AuthFlowType,
   ChallengeNameType,
   CognitoIdentityProvider,
-  CognitoIdentityProviderClient,
-  ConfirmSignUpCommand,
-  ConfirmSignUpCommandInput,
   InvalidPasswordException,
   ResendConfirmationCodeCommand,
   RespondToAuthChallengeCommandInput,
   SignUpCommand,
   SignUpCommandInput,
   UsernameExistsException,
+  VerifyUserAttributeCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
-import {
-  UnauthorizedException,
-  BadRequestException,
-  Injectable,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'crypto';
 import { SignUpDto } from './../dto/signup.dto';
@@ -104,12 +98,7 @@ export class CognitoService {
       ClientId: this.clientId,
       Password: signUpDto.password,
       Username: signUpDto.username,
-      ValidationData: [
-        {
-          Name: 'email',
-          Value: signUpDto.email,
-        },
-      ],
+      ValidationData: [{ Name: 'phone_number', Value: '+85267034350' }],
       SecretHash: secretHash,
       UserAttributes: [
         { Name: 'name', Value: 'John Doe' },
@@ -120,7 +109,7 @@ export class CognitoService {
         { Name: 'email', Value: signUpDto.email },
         { Name: 'gender', Value: 'male' },
         { Name: 'birthdate', Value: '1970-01-01' },
-        { Name: 'phone_number', Value: '+1234567890' },
+        { Name: 'phone_number', Value: '+85267034350' },
       ],
     };
 
@@ -151,9 +140,17 @@ export class CognitoService {
     const command = new AdminConfirmSignUpCommand(params1);
     const confirmResponse = await this.cognito.send(command);
 
+    return {
+      ...(signUpResponse !== null && { signUpResponse }),
+      confirmResponse: confirmResponse,
+    };
+  }
+
+  async sendSMS(username: string) {
+    const secretHash = this.createSecretHash(username);
     const reparams = {
       ClientId: this.clientId,
-      Username: signUpDto.username,
+      Username: username,
       SecretHash: secretHash,
     };
 
@@ -161,7 +158,7 @@ export class CognitoService {
     const resendConfirmationCodeCommand = new ResendConfirmationCodeCommand(
       reparams,
     );
-
+    let resendConfirmationCodeResponse = null;
     try {
       const resendConfirmationCodeResponse = await this.cognito.send(
         resendConfirmationCodeCommand,
@@ -174,10 +171,22 @@ export class CognitoService {
       console.error('Error resending confirmation code:', err);
     }
 
-    return {
-      ...(signUpResponse !== null && { signUpResponse }),
-      confirmResponse: confirmResponse,
+    return resendConfirmationCodeResponse;
+  }
+
+  async confirmSMS(accessToken: string, confirmationCode: string) {
+    //const secretHash = this.createSecretHash(username);
+    const params = {
+      AccessToken: accessToken,
+      AttributeName: 'phone_number',
+      Code: confirmationCode,
+      // SecretHash: secretHash,
     };
+
+    const command = new VerifyUserAttributeCommand(params);
+    const confirmResponse = await this.cognito.send(command);
+
+    return confirmResponse;
   }
 
   getJwksUri() {
