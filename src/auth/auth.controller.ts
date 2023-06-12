@@ -2,9 +2,11 @@
 
 import { Body, Controller, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { ConfirmSignUpDto } from './dto/confirm-sign-up.dto';
 import { LoginDto } from './dto/login.dto';
 import { NewPasswordDto } from './dto/new-password.dto';
 import { SignUpDto } from './dto/signup.dto';
+
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
@@ -24,12 +26,9 @@ export class AuthController {
     return this.authService.sendSMS(username);
   }
 
-  @Post('confirm-sms')
-  async confirmSMS(
-    @Body('accessToken') accessToken: string,
-    @Body('confirmationCode') confirmationCode: string,
-  ) {
-    return this.authService.confirmSMS(accessToken, confirmationCode);
+  @Post('confirm-sms-signup')
+  async confirmSmsSignUp(@Body() confirmSignUpDto: ConfirmSignUpDto) {
+    return this.authService.confirmSMSSignUp(confirmSignUpDto);
   }
 
   @Post('respond-to-new-password-required')

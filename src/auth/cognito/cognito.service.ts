@@ -1,21 +1,21 @@
 // src/auth/cognito/cognito.service.ts
 import {
-  AdminConfirmSignUpCommand,
-  AdminConfirmSignUpCommandInput,
   AuthFlowType,
   ChallengeNameType,
   CognitoIdentityProvider,
-  InvalidPasswordException,
+  ConfirmSignUpCommand,
   ResendConfirmationCodeCommand,
   RespondToAuthChallengeCommandInput,
   SignUpCommand,
   SignUpCommandInput,
-  UsernameExistsException,
+  SignUpCommandOutput,
   VerifyUserAttributeCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'crypto';
+import { ConfirmOTPDto } from '../dto/confirm-otp.dto';
+import { ConfirmSignUpDto } from '../dto/confirm-sign-up.dto';
 import { SignUpDto } from './../dto/signup.dto';
 
 @Injectable()
@@ -92,100 +92,61 @@ export class CognitoService {
     return await this.cognito.respondToAuthChallenge(params);
   }
 
-  async signUp(signUpDto: SignUpDto) {
+  async signUp(signUpDto: SignUpDto): Promise<SignUpCommandOutput> {
     const secretHash = this.createSecretHash(signUpDto.username);
     const params: SignUpCommandInput = {
       ClientId: this.clientId,
       Password: signUpDto.password,
       Username: signUpDto.username,
-      ValidationData: [{ Name: 'phone_number', Value: '+85267034350' }],
       SecretHash: secretHash,
       UserAttributes: [
-        { Name: 'name', Value: 'John Doe' },
-        { Name: 'given_name', Value: 'John' },
-        { Name: 'family_name', Value: 'Doe' },
-        { Name: 'profile', Value: 'http://example.com/profile' },
-        { Name: 'picture', Value: 'http://example.com/picture' },
+        { Name: 'name', Value: signUpDto.name },
+        { Name: 'given_name', Value: signUpDto.given_name },
+        { Name: 'family_name', Value: signUpDto.family_name },
+        { Name: 'profile', Value: signUpDto.profile },
+        { Name: 'picture', Value: signUpDto.picture },
         { Name: 'email', Value: signUpDto.email },
-        { Name: 'gender', Value: 'male' },
-        { Name: 'birthdate', Value: '1970-01-01' },
-        { Name: 'phone_number', Value: '+85267034350' },
+        { Name: 'gender', Value: signUpDto.gender },
+        { Name: 'birthdate', Value: signUpDto.birthdate },
+        { Name: 'phone_number', Value: signUpDto.phone_number },
       ],
     };
 
-    let signUpResponse = null;
-    let signUpError = null;
-    try {
-      const signUpCommand = new SignUpCommand(params);
-      signUpResponse = await this.cognito.send(signUpCommand);
-    } catch (error) {
-      if (error instanceof UsernameExistsException) {
-        // Handle the case where the username already exists
-        signUpError = { message: 'Username already exists' };
-      } else if (error instanceof InvalidPasswordException) {
-        // Handle the case where the password is invalid
-        signUpError = { message: 'Invalid password' };
-      } else {
-        // Handle all other errors
-        signUpError = { message: 'Error occurred during sign-up' };
-      }
-    }
-
-    //Confirm the sign-up for the user
-
-    const params1: AdminConfirmSignUpCommandInput = {
-      UserPoolId: this.userPoolId,
-      Username: signUpDto.username,
-    };
-    const command = new AdminConfirmSignUpCommand(params1);
-    const confirmResponse = await this.cognito.send(command);
-
-    return {
-      ...(signUpResponse !== null && { signUpResponse }),
-      confirmResponse: confirmResponse,
-    };
+    const signUpCommand = new SignUpCommand(params);
+    const signUpResponse = await this.cognito.send(signUpCommand);
+    return signUpResponse;
   }
 
   async sendSMS(username: string) {
-    const secretHash = this.createSecretHash(username);
-    const reparams = {
-      ClientId: this.clientId,
-      Username: username,
-      SecretHash: secretHash,
-    };
-
     // Resend the confirmation code
-    const resendConfirmationCodeCommand = new ResendConfirmationCodeCommand(
-      reparams,
+    const response = await this.cognito.send(
+      new ResendConfirmationCodeCommand({
+        ClientId: this.clientId,
+        Username: username,
+        SecretHash: this.createSecretHash(username),
+      }),
     );
-    let resendConfirmationCodeResponse = null;
-    try {
-      const resendConfirmationCodeResponse = await this.cognito.send(
-        resendConfirmationCodeCommand,
-      );
-      console.log(
-        'Confirmation code resent successfully:',
-        resendConfirmationCodeResponse,
-      );
-    } catch (err) {
-      console.error('Error resending confirmation code:', err);
-    }
-
-    return resendConfirmationCodeResponse;
+    return response;
   }
 
-  async confirmSMS(accessToken: string, confirmationCode: string) {
-    //const secretHash = this.createSecretHash(username);
-    const params = {
+  async confirmSMS({ accessToken, code }: ConfirmOTPDto) {
+    const command = new VerifyUserAttributeCommand({
       AccessToken: accessToken,
       AttributeName: 'phone_number',
-      Code: confirmationCode,
-      // SecretHash: secretHash,
-    };
-
-    const command = new VerifyUserAttributeCommand(params);
+      Code: code,
+    });
     const confirmResponse = await this.cognito.send(command);
+    return confirmResponse;
+  }
 
+  async confirmSignUp({ username, code }: ConfirmSignUpDto) {
+    const command = new ConfirmSignUpCommand({
+      ClientId: this.clientId,
+      ConfirmationCode: code,
+      Username: username,
+      SecretHash: this.createSecretHash(username),
+    });
+    const confirmResponse = await this.cognito.send(command);
     return confirmResponse;
   }
 

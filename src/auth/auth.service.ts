@@ -7,6 +7,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { CognitoService } from './cognito/cognito.service';
+import { ConfirmOTPDto } from './dto/confirm-otp.dto';
+import { ConfirmSignUpDto } from './dto/confirm-sign-up.dto';
 import { SignUpDto } from './dto/signup.dto';
 @Injectable()
 export class AuthService {
@@ -41,21 +43,8 @@ export class AuthService {
 
   async signUp(signUpDto: SignUpDto) {
     try {
-      if (!signUpDto.username) {
-        throw new BadRequestException('Username is required.');
-      }
-      const response = await this.cognitoService.signUp({
-        username: signUpDto.username,
-        email: signUpDto.email,
-        password: signUpDto.password,
-      });
-      const userSub = response;
-      const username = signUpDto.username;
-      return {
-        message: 'User signed up successfully.',
-        userSub,
-        username, // Include the username field in the response object
-      };
+      const response = await this.cognitoService.signUp(signUpDto);
+      return response;
     } catch (error) {
       console.error(error);
       // Customize error handling as needed
@@ -66,26 +55,25 @@ export class AuthService {
   async sendSMS(username: string) {
     try {
       const response = await this.cognitoService.sendSMS(username);
-      return {
-        message: 'sendSMS successfully.',
-        response,
-      };
+      return response;
     } catch (error) {
       console.error(error);
       throw new BadRequestException('Unable to sendSMS.');
     }
   }
 
-  async confirmSMS(accessToken: string, confirmationCode: string) {
+  async confirmSMS(payload: ConfirmOTPDto) {
     try {
-      const response = await this.cognitoService.confirmSMS(
-        accessToken,
-        confirmationCode,
-      );
-      return {
-        message: 'Phone number confirmed successfully.',
-        response,
-      };
+      const response = await this.cognitoService.confirmSMS(payload);
+      return response;
+    } catch (error) {
+      console.error(error);
+      throw new BadRequestException('Unable to confirm phone number.');
+    }
+  }
+  async confirmSMSSignUp(payload: ConfirmSignUpDto) {
+    try {
+      return await this.cognitoService.confirmSignUp(payload);
     } catch (error) {
       console.error(error);
       throw new BadRequestException('Unable to confirm phone number.');
