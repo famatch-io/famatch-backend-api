@@ -3,6 +3,7 @@
 import { ChallengeNameType } from '@aws-sdk/client-cognito-identity-provider';
 import { Injectable } from '@nestjs/common';
 import { CognitoService } from './cognito/cognito.service';
+import { AuthenticateWithGoogleDto } from './dto/google.dto';
 import { ConfirmSignUpDto } from './dto/otp.dto';
 import { SignUpDto } from './dto/signup.dto';
 @Injectable()
@@ -34,6 +35,15 @@ export class AuthService {
   async signUp(signUpDto: SignUpDto) {
     const response = await this.cognitoService.signUp(signUpDto);
     return response;
+  }
+
+  async authenticateWithGoogle(
+    authenticateWithGoogleDto: AuthenticateWithGoogleDto,
+  ) {
+    const tokens = await this.cognitoService.authenticateWithGoogle(
+      authenticateWithGoogleDto,
+    );
+    return tokens;
   }
 
   async sendSMS(username: string) {
