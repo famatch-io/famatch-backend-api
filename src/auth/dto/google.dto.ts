@@ -5,9 +5,6 @@ export class AuthenticateWithGoogleDto {
   readonly email: string;
 
   @IsString()
-  readonly password: string;
-
-  @IsString()
   readonly code: string;
 
   @IsString()
