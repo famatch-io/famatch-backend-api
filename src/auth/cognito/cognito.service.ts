@@ -132,7 +132,7 @@ export class CognitoService {
   async authenticateWithGoogle(
     authenticateWithGoogleDto: AuthenticateWithGoogleDto,
   ) {
-    const { email, password, code, redirectUri } = authenticateWithGoogleDto;
+    const { email, code, redirectUri } = authenticateWithGoogleDto;
     const authParameters = {
       USERNAME: email,
       SRP_A: code,
