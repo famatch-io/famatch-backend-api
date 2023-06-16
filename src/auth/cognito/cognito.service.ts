@@ -3,8 +3,10 @@ import {
   AuthFlowType,
   ChallengeNameType,
   CognitoIdentityProvider,
+  CognitoIdentityProviderClient,
   ConfirmSignUpCommand,
   GetUserAttributeVerificationCodeCommand,
+  InitiateAuthCommand,
   ResendConfirmationCodeCommand,
   RespondToAuthChallengeCommandInput,
   SignUpCommand,
@@ -16,12 +18,14 @@ import {
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'crypto';
+import { AuthenticateWithGoogleDto } from '../dto/google.dto';
 import { ConfirmSignUpDto } from '../dto/otp.dto';
 import { SignUpDto } from './../dto/signup.dto';
 
 @Injectable()
 export class CognitoService {
   private cognito: CognitoIdentityProvider;
+  private cognitoClient: CognitoIdentityProviderClient;
   private region: string;
   private clientId: string;
   private clientSecret: string;
@@ -36,6 +40,14 @@ export class CognitoService {
     );
 
     this.cognito = new CognitoIdentityProvider({
+      region: this.region,
+      credentials: {
+        accessKeyId: this.configService.get('AWS_COGNITO_IAM_KEY'),
+        secretAccessKey: this.configService.get('AWS_COGNITO_IAM_SECRET'),
+      },
+    });
+
+    this.cognitoClient = new CognitoIdentityProviderClient({
       region: this.region,
       credentials: {
         accessKeyId: this.configService.get('AWS_COGNITO_IAM_KEY'),
@@ -115,6 +127,33 @@ export class CognitoService {
     const signUpCommand = new SignUpCommand(params);
     const signUpResponse = await this.cognito.send(signUpCommand);
     return signUpResponse;
+  }
+
+  async authenticateWithGoogle(
+    authenticateWithGoogleDto: AuthenticateWithGoogleDto,
+  ) {
+    const { email, password, code, redirectUri } = authenticateWithGoogleDto;
+    const authParameters = {
+      USERNAME: email,
+      SRP_A: code,
+    };
+    const initiateAuthCommandInput = {
+      AuthFlow: 'USER_SRP_AUTH',
+      ClientId: this.clientId,
+      UserPoolId: this.userPoolId,
+      AuthParameters: authParameters,
+      ClientMetadata: { redirect_uri: redirectUri },
+    };
+    const initiateAuthCommand = new InitiateAuthCommand(
+      initiateAuthCommandInput,
+    );
+    const response = await this.cognitoClient.send(initiateAuthCommand);
+    const tokens = {
+      accessToken: response.AuthenticationResult.AccessToken,
+      idToken: response.AuthenticationResult.IdToken,
+      refreshToken: response.AuthenticationResult.RefreshToken,
+    };
+    return tokens;
   }
 
   async sendEmailVerificationCode(accessToken: string) {

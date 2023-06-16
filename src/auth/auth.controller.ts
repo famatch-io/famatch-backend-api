@@ -3,17 +3,27 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
+import { AuthenticateWithGoogleDto } from './dto/google.dto';
 import { LoginDto } from './dto/login.dto';
 import { NewPasswordDto } from './dto/new-password.dto';
 import { CodeDto, ConfirmSignUpDto } from './dto/otp.dto';
 import { SignUpDto } from './dto/signup.dto';
 import { GetAccessToken } from './get-jwt.decorator';
 import { JwtAuthGuard } from './jwt-auth.guard';
-
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
+
+  @Post('google')
+  async authenticateWithGoogle(
+    @Body() authenticateWithGoogleDto: AuthenticateWithGoogleDto,
+  ) {
+    const tokens = await this.authService.authenticateWithGoogle(
+      authenticateWithGoogleDto,
+    );
+    return tokens;
+  }
 
   @Post('login')
   login(@Body() loginDto: LoginDto) {
