@@ -6,7 +6,6 @@ import {
   CognitoIdentityProviderClient,
   ConfirmSignUpCommand,
   GetUserAttributeVerificationCodeCommand,
-  InitiateAuthCommand,
   ResendConfirmationCodeCommand,
   RespondToAuthChallengeCommandInput,
   SignUpCommand,
@@ -15,7 +14,7 @@ import {
   VerifyUserAttributeCommand,
   VerifyUserAttributeCommandInput,
 } from '@aws-sdk/client-cognito-identity-provider';
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'crypto';
 import { AuthenticateWithGoogleDto } from '../dto/google.dto';
@@ -29,12 +28,16 @@ export class CognitoService {
   private region: string;
   private clientId: string;
   private clientSecret: string;
+  private googleId: string;
+  private googleSecret: string;
   private userPoolId: string;
 
   constructor(private configService: ConfigService) {
     this.region = this.configService.get('AWS_COGNITO_REGION');
     this.clientId = this.configService.get('AWS_COGNITO_CLIENT_ID');
     this.clientSecret = this.configService.get('AWS_COGNITO_CLIENT_SECRET');
+    this.googleId = this.configService.get('GOOGLE_CLIENT_ID');
+    this.googleSecret = this.configService.get('GOOGLE_CLIENT_SECRET');
     this.userPoolId = this.configService.get<string>(
       'AWS_COGNITO_USER_POOL_ID',
     );
@@ -131,29 +134,59 @@ export class CognitoService {
 
   async authenticateWithGoogle(
     authenticateWithGoogleDto: AuthenticateWithGoogleDto,
-  ) {
-    const { email, code, redirectUri } = authenticateWithGoogleDto;
-    const authParameters = {
-      USERNAME: email,
-      SRP_A: code,
-    };
-    const initiateAuthCommandInput = {
+  ): Promise<string> {
+    const { idToken } = authenticateWithGoogleDto;
+
+    const initiateAuthParams = {
       AuthFlow: 'USER_SRP_AUTH',
       ClientId: this.clientId,
-      UserPoolId: this.userPoolId,
-      AuthParameters: authParameters,
-      ClientMetadata: { redirect_uri: redirectUri },
+      AuthParameters: {
+        USERNAME: idToken,
+        SRP_A: 'PLACEHOLDER', // Will be replaced by Cognito challenge
+      },
     };
-    const initiateAuthCommand = new InitiateAuthCommand(
-      initiateAuthCommandInput,
-    );
-    const response = await this.cognitoClient.send(initiateAuthCommand);
-    const tokens = {
-      accessToken: response.AuthenticationResult.AccessToken,
-      idToken: response.AuthenticationResult.IdToken,
-      refreshToken: response.AuthenticationResult.RefreshToken,
-    };
-    return tokens;
+
+    let challengeName;
+    let challengeParameters;
+
+    try {
+      const initiateAuthResponse = await this.cognito.initiateAuth(
+        initiateAuthParams,
+      );
+      challengeName = initiateAuthResponse.ChallengeName;
+      challengeParameters = initiateAuthResponse.ChallengeParameters;
+    } catch (error) {
+      throw new UnauthorizedException('Invalid Google ID token');
+    }
+
+    if (challengeName === 'PASSWORD_VERIFIER') {
+      // Construct response using SRP_A and SRP_B
+      const respondToAuthChallengeParams = {
+        ChallengeName: 'PASSWORD_VERIFIER',
+        ClientId: this.clientId,
+        ChallengeResponses: {
+          USERNAME: idToken,
+          PASSWORD_CLAIM_SECRET_BLOCK: challengeParameters.SECRET_BLOCK,
+          PASSWORD_CLAIM_SIGNATURE: challengeParameters.SIGNATURE,
+          TIMESTAMP: Math.floor(Date.now() / 1000).toString(),
+        },
+        Session: challengeParameters.SESSION,
+      };
+
+      try {
+        const respondToAuthChallengeResponse =
+          await this.cognito.respondToAuthChallenge(
+            respondToAuthChallengeParams,
+          );
+        return respondToAuthChallengeResponse.AuthenticationResult.IdToken;
+      } catch (error) {
+        throw new UnauthorizedException('Invalid Google ID token');
+      }
+    } else if (challengeName === 'NEW_PASSWORD_REQUIRED') {
+      // Handle new password required flow
+    } else {
+      throw new Error(`Unexpected Cognito auth flow "${challengeName}"`);
+    }
   }
 
   async sendEmailVerificationCode(accessToken: string) {
