@@ -50,13 +50,13 @@ export class CognitoService {
       .digest('base64');
   }
 
-  async initiateAuth(email: string, password: string) {
-    const secretHash = this.createSecretHash(email);
+  async initiateAuth(usernameOrEmail: string, password: string) {
+    const secretHash = this.createSecretHash(usernameOrEmail);
     const params = {
       AuthFlow: AuthFlowType.USER_PASSWORD_AUTH,
       ClientId: this.clientId,
       AuthParameters: {
-        USERNAME: email,
+        USERNAME: usernameOrEmail,
         PASSWORD: password,
         SECRET_HASH: secretHash,
       },

@@ -9,9 +9,9 @@ import { SignUpDto } from './dto/signup.dto';
 export class AuthService {
   constructor(private cognitoService: CognitoService) {}
 
-  async login(username: string, password: string) {
+  async login(usernameOrEmail: string, password: string) {
     const { ChallengeName, AuthenticationResult, Session } =
-      await this.cognitoService.initiateAuth(username, password);
+      await this.cognitoService.initiateAuth(usernameOrEmail, password);
 
     // * user first time login will require reset password
     if (ChallengeName === ChallengeNameType.NEW_PASSWORD_REQUIRED) {
