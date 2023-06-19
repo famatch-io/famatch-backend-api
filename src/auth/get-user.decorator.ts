@@ -1,8 +1,8 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { User } from '@prisma/client';
+import { AWSCognitoPayload } from './models/AwsCognitoPayload';
 
-export const GetUser = createParamDecorator(
-  (data, ctx: ExecutionContext): User => {
+export const GetCognitoUser = createParamDecorator(
+  (data, ctx: ExecutionContext): AWSCognitoPayload => {
     const req = ctx.switchToHttp().getRequest();
     return req.user;
   },

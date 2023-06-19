@@ -1,7 +1,8 @@
-import { Controller, Get, Post } from '@nestjs/common';
-import { Notification } from '@prisma/client';
+import { Controller, Get } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { AppService } from './app.service';
 
+@ApiTags('app')
 @Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}
@@ -9,15 +10,5 @@ export class AppController {
   @Get()
   getHello(): string {
     return this.appService.getHello();
-  }
-
-  @Get('test-notifications')
-  async getNotifications(): Promise<Notification[]> {
-    return this.appService.getTestNotis();
-  }
-
-  @Post('test-notifications')
-  async generateOneNotification(): Promise<Notification> {
-    return this.appService.generateOneTestNoti();
   }
 }
