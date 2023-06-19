@@ -10,6 +10,7 @@ import { AuthService } from './auth.service';
 import { CognitoModule } from './cognito/cognito.module';
 import { CognitoService } from './cognito/cognito.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
@@ -26,7 +27,13 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     CognitoModule, // import cognito module
     UserModule,
   ],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, CognitoService],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    JwtAuthGuard,
+    CognitoService,
+    GoogleStrategy,
+  ],
   controllers: [AuthController],
   exports: [JwtAuthGuard],
 })

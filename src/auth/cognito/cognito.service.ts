@@ -3,6 +3,7 @@ import {
   AuthFlowType,
   ChallengeNameType,
   CognitoIdentityProvider,
+  CognitoIdentityProviderClient,
   ConfirmSignUpCommand,
   GetUserAttributeVerificationCodeCommand,
   ResendConfirmationCodeCommand,
@@ -13,29 +14,43 @@ import {
   VerifyUserAttributeCommand,
   VerifyUserAttributeCommandInput,
 } from '@aws-sdk/client-cognito-identity-provider';
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'crypto';
+import { AuthenticateWithGoogleDto } from '../dto/google.dto';
 import { ConfirmSignUpDto } from '../dto/otp.dto';
 import { SignUpDto } from './../dto/signup.dto';
 
 @Injectable()
 export class CognitoService {
   private cognito: CognitoIdentityProvider;
+  private cognitoClient: CognitoIdentityProviderClient;
   private region: string;
   private clientId: string;
   private clientSecret: string;
+  private googleId: string;
+  private googleSecret: string;
   private userPoolId: string;
 
   constructor(private configService: ConfigService) {
     this.region = this.configService.get('AWS_COGNITO_REGION');
     this.clientId = this.configService.get('AWS_COGNITO_CLIENT_ID');
     this.clientSecret = this.configService.get('AWS_COGNITO_CLIENT_SECRET');
+    this.googleId = this.configService.get('GOOGLE_CLIENT_ID');
+    this.googleSecret = this.configService.get('GOOGLE_CLIENT_SECRET');
     this.userPoolId = this.configService.get<string>(
       'AWS_COGNITO_USER_POOL_ID',
     );
 
     this.cognito = new CognitoIdentityProvider({
+      region: this.region,
+      credentials: {
+        accessKeyId: this.configService.get('AWS_COGNITO_IAM_KEY'),
+        secretAccessKey: this.configService.get('AWS_COGNITO_IAM_SECRET'),
+      },
+    });
+
+    this.cognitoClient = new CognitoIdentityProviderClient({
       region: this.region,
       credentials: {
         accessKeyId: this.configService.get('AWS_COGNITO_IAM_KEY'),
@@ -115,6 +130,63 @@ export class CognitoService {
     const signUpCommand = new SignUpCommand(params);
     const signUpResponse = await this.cognito.send(signUpCommand);
     return signUpResponse;
+  }
+
+  async authenticateWithGoogle(
+    authenticateWithGoogleDto: AuthenticateWithGoogleDto,
+  ): Promise<string> {
+    const { idToken } = authenticateWithGoogleDto;
+
+    const initiateAuthParams = {
+      AuthFlow: 'USER_SRP_AUTH',
+      ClientId: this.clientId,
+      AuthParameters: {
+        USERNAME: idToken,
+        SRP_A: 'PLACEHOLDER', // Will be replaced by Cognito challenge
+      },
+    };
+
+    let challengeName;
+    let challengeParameters;
+
+    try {
+      const initiateAuthResponse = await this.cognito.initiateAuth(
+        initiateAuthParams,
+      );
+      challengeName = initiateAuthResponse.ChallengeName;
+      challengeParameters = initiateAuthResponse.ChallengeParameters;
+    } catch (error) {
+      throw new UnauthorizedException('Invalid Google ID token');
+    }
+
+    if (challengeName === 'PASSWORD_VERIFIER') {
+      // Construct response using SRP_A and SRP_B
+      const respondToAuthChallengeParams = {
+        ChallengeName: 'PASSWORD_VERIFIER',
+        ClientId: this.clientId,
+        ChallengeResponses: {
+          USERNAME: idToken,
+          PASSWORD_CLAIM_SECRET_BLOCK: challengeParameters.SECRET_BLOCK,
+          PASSWORD_CLAIM_SIGNATURE: challengeParameters.SIGNATURE,
+          TIMESTAMP: Math.floor(Date.now() / 1000).toString(),
+        },
+        Session: challengeParameters.SESSION,
+      };
+
+      try {
+        const respondToAuthChallengeResponse =
+          await this.cognito.respondToAuthChallenge(
+            respondToAuthChallengeParams,
+          );
+        return respondToAuthChallengeResponse.AuthenticationResult.IdToken;
+      } catch (error) {
+        throw new UnauthorizedException('Invalid Google ID token');
+      }
+    } else if (challengeName === 'NEW_PASSWORD_REQUIRED') {
+      // Handle new password required flow
+    } else {
+      throw new Error(`Unexpected Cognito auth flow "${challengeName}"`);
+    }
   }
 
   async sendEmailVerificationCode(accessToken: string) {
