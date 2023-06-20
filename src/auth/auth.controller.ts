@@ -1,15 +1,22 @@
 // src/auth/auth.controller.ts
-
-import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { AuthenticateWithGoogleDto } from './dto/google.dto';
 import { LoginDto } from './dto/login.dto';
 import { NewPasswordDto } from './dto/new-password.dto';
 import { CodeDto, ConfirmSignUpDto } from './dto/otp.dto';
 import { SignUpDto } from './dto/signup.dto';
 import { GetAccessToken } from './get-jwt.decorator';
 import { JwtAuthGuard } from './jwt-auth.guard';
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -18,7 +25,9 @@ export class AuthController {
   @Get('google')
   async googleLogin(@Req() req: Request, @Res() res: Response) {
     const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
-    const redirectUri = `${req.protocol}://${req.get('host')}/auth/google/callback`;
+    const redirectUri = `${req.protocol}://${req.get(
+      'host',
+    )}/auth/google/callback`;
 
     const queryParams = querystring.stringify({
       client_id: clientId,
@@ -31,12 +40,13 @@ export class AuthController {
 
     res.redirect(authUrl);
   }
-  
   @Get('google/callback')
   async googleCallback(@Req() req: Request, @Res() res: Response) {
     const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
     const clientSecret = this.configService.get<string>('GOOGLE_CLIENT_SECRET');
-    const redirectUri = `${req.protocol}://${req.get('host')}/auth/google/callback`;
+    const redirectUri = `${req.protocol}://${req.get(
+      'host',
+    )}/auth/google/callback`;
     const code = req.query.code;
 
     // Exchange authorization code for access token and id token
@@ -60,21 +70,20 @@ export class AuthController {
     );
     const publicKeySet = publicKeyResponse.keys;
     let verifiedIdToken;
-    
-     try {
-       verifiedIdToken = jwt.verify(idToken, getPublicKey(publicKeySet));
-     } catch (err) {
-       console.error(err);
-       return res.status(401).send();
-     }
 
-     // Authenticate user in your application using verifiedIdToken.sub
-     // ...
-   }
-}
+    try {
+      verifiedIdToken = jwt.verify(idToken, getPublicKey(publicKeySet));
+    } catch (err) {
+      console.error(err);
+      return res.status(401).send();
+    }
+
+    // Authenticate user in your application using verifiedIdToken.sub
+    // ...
+  }
   @Post('login')
   login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto.username, loginDto.password);
+    return this.authService.login(loginDto.usernameOrEmail, loginDto.password);
   }
 
   @Post('signup')
