@@ -3,13 +3,11 @@
 import { ChallengeNameType } from '@aws-sdk/client-cognito-identity-provider';
 import { Injectable } from '@nestjs/common';
 import { CognitoService } from './cognito/cognito.service';
-import { AuthenticateWithGoogleDto } from './dto/google.dto';
 import { ConfirmSignUpDto } from './dto/otp.dto';
 import { SignUpDto } from './dto/signup.dto';
 @Injectable()
 export class AuthService {
   constructor(private cognitoService: CognitoService) {}
-
   async login(usernameOrEmail: string, password: string) {
     const { ChallengeName, AuthenticationResult, Session } =
       await this.cognitoService.initiateAuth(usernameOrEmail, password);
@@ -35,15 +33,6 @@ export class AuthService {
   async signUp(signUpDto: SignUpDto) {
     const response = await this.cognitoService.signUp(signUpDto);
     return response;
-  }
-
-  async authenticateWithGoogle(
-    authenticateWithGoogleDto: AuthenticateWithGoogleDto,
-  ) {
-    const tokens = await this.cognitoService.authenticateWithGoogle(
-      authenticateWithGoogleDto,
-    );
-    return tokens;
   }
 
   async sendSMS(username: string) {
@@ -89,28 +78,11 @@ export class AuthService {
     };
   }
 
-  async findOrCreateUserFromGoogleProfile(profile: any): Promise<any> {
-    // This function will be called when the user is authenticated via Google.
-    // You can use the information in the `profile` object to create or update a user in your database.
-
-    // Example code:
-    const user = await this.userService.findOrCreateUserByEmail(profile.emails[0].value);
-    return user;
+  redirectToGoogle() {
+    return this.cognitoService.redirectToGoogle();
   }
 
-  async googleLogin(idToken: string) {
-    const ticket = await this.googleClient.verifyIdToken({
-      idToken: idToken,
-      audience: 'YOUR_CLIENT_ID',
-    });
-
-    const payload = ticket.getPayload();
-    const email = payload.email;
-
-    const user = await this.findOrCreateUserFromGoogleProfile(payload);
-    // TODO: Use the `user` object to generate a JWT access token.
-
-    return 'ACCESS_TOKEN';
+  googleLoginCallback(req: any) {
+    return this.cognitoService.googleLoginCallback(req);
   }
-}
 }

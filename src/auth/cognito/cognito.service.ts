@@ -6,6 +6,7 @@ import {
   CognitoIdentityProviderClient,
   ConfirmSignUpCommand,
   GetUserAttributeVerificationCodeCommand,
+  InitiateAuthCommand,
   ResendConfirmationCodeCommand,
   RespondToAuthChallengeCommandInput,
   SignUpCommand,
@@ -14,10 +15,10 @@ import {
   VerifyUserAttributeCommand,
   VerifyUserAttributeCommandInput,
 } from '@aws-sdk/client-cognito-identity-provider';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
 import { createHmac } from 'crypto';
-import { AuthenticateWithGoogleDto } from '../dto/google.dto';
 import { ConfirmSignUpDto } from '../dto/otp.dto';
 import { SignUpDto } from './../dto/signup.dto';
 
@@ -31,13 +32,17 @@ export class CognitoService {
   private googleId: string;
   private googleSecret: string;
   private userPoolId: string;
-
+  private cognitoDomainName: string;
+  private readonly googleRedirUrl: string;
   constructor(private configService: ConfigService) {
     this.region = this.configService.get('AWS_COGNITO_REGION');
     this.clientId = this.configService.get('AWS_COGNITO_CLIENT_ID');
     this.clientSecret = this.configService.get('AWS_COGNITO_CLIENT_SECRET');
     this.googleId = this.configService.get('GOOGLE_CLIENT_ID');
     this.googleSecret = this.configService.get('GOOGLE_CLIENT_SECRET');
+    this.cognitoDomainName = this.configService.get('AWS_COGNITO_DOMAIN');
+    this.googleRedirUrl = `https://famatch.io`;
+
     this.userPoolId = this.configService.get<string>(
       'AWS_COGNITO_USER_POOL_ID',
     );
@@ -132,63 +137,6 @@ export class CognitoService {
     return signUpResponse;
   }
 
-  async authenticateWithGoogle(
-    authenticateWithGoogleDto: AuthenticateWithGoogleDto,
-  ): Promise<string> {
-    const { idToken } = authenticateWithGoogleDto;
-
-    const initiateAuthParams = {
-      AuthFlow: 'USER_SRP_AUTH',
-      ClientId: this.clientId,
-      AuthParameters: {
-        USERNAME: idToken,
-        SRP_A: 'PLACEHOLDER', // Will be replaced by Cognito challenge
-      },
-    };
-
-    let challengeName;
-    let challengeParameters;
-
-    try {
-      const initiateAuthResponse = await this.cognito.initiateAuth(
-        initiateAuthParams,
-      );
-      challengeName = initiateAuthResponse.ChallengeName;
-      challengeParameters = initiateAuthResponse.ChallengeParameters;
-    } catch (error) {
-      throw new UnauthorizedException('Invalid Google ID token');
-    }
-
-    if (challengeName === 'PASSWORD_VERIFIER') {
-      // Construct response using SRP_A and SRP_B
-      const respondToAuthChallengeParams = {
-        ChallengeName: 'PASSWORD_VERIFIER',
-        ClientId: this.clientId,
-        ChallengeResponses: {
-          USERNAME: idToken,
-          PASSWORD_CLAIM_SECRET_BLOCK: challengeParameters.SECRET_BLOCK,
-          PASSWORD_CLAIM_SIGNATURE: challengeParameters.SIGNATURE,
-          TIMESTAMP: Math.floor(Date.now() / 1000).toString(),
-        },
-        Session: challengeParameters.SESSION,
-      };
-
-      try {
-        const respondToAuthChallengeResponse =
-          await this.cognito.respondToAuthChallenge(
-            respondToAuthChallengeParams,
-          );
-        return respondToAuthChallengeResponse.AuthenticationResult.IdToken;
-      } catch (error) {
-        throw new UnauthorizedException('Invalid Google ID token');
-      }
-    } else if (challengeName === 'NEW_PASSWORD_REQUIRED') {
-      // Handle new password required flow
-    } else {
-      throw new Error(`Unexpected Cognito auth flow "${challengeName}"`);
-    }
-  }
-
   async sendEmailVerificationCode(accessToken: string) {
     const command = new GetUserAttributeVerificationCodeCommand({
       AccessToken: accessToken,
@@ -228,5 +176,120 @@ export class CognitoService {
 
   getJwksUri() {
     return `https://cognito-idp.${this.region}.amazonaws.com/${this.userPoolId}/.well-known/jwks.json`;
+  }
+
+  getGoogleAuthUrl() {
+    const redirectUri = 'https://famatch.io';
+    const scopes = ['openid', 'profile', 'email'];
+
+    const params = {
+      ClientId: this.clientId,
+      RedirectUri: redirectUri,
+      AuthFlow: 'USER_SRP_AUTH',
+      AuthParameters: {
+        auth_type: 'rerequest',
+        scope: scopes.join(' '),
+        identity_provider: 'Google',
+        state: 'STATE_STRING',
+      },
+    };
+
+    const url = 'this.cognito.url(params).authorizeURL()';
+    return url;
+  }
+
+  async exchangeCodeForIdToken(code) {
+    const tokenEndpoint = 'https://oauth2.googleapis.com/token';
+
+    const params = new URLSearchParams({
+      code,
+      client_id: this.googleId,
+      client_secret: this.googleSecret,
+      redirect_uri: `https://${this.cognitoDomainName}.auth.${this.region}.amazoncognito.com/oauth2/idpresponse`,
+      grant_type: 'authorization_code',
+    });
+
+    const response = await fetch(tokenEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to exchange code for ID token. Status code ${response.status}`,
+      );
+    }
+
+    const { id_token } = await response.json();
+
+    return id_token;
+  }
+
+  async authenticateWithCognito(idToken: string) {
+    const authResult = await this.cognitoClient.send(
+      new InitiateAuthCommand({
+        AuthFlow: 'CUSTOM_AUTH',
+        AuthParameters: {
+          'cognito:username': '',
+          'cognito:custom:google:id_token': idToken,
+          'cognito:userpool:id': this.userPoolId,
+        },
+        ClientId: this.clientId,
+      }),
+    );
+
+    const { AccessToken, IdToken, RefreshToken } =
+      authResult.AuthenticationResult!;
+    return {
+      accessToken: AccessToken!,
+      idToken: IdToken!,
+      refreshToken: RefreshToken!,
+    };
+  }
+
+  redirectToGoogle() {
+    const params = new URLSearchParams({
+      client_id: this.googleId,
+      redirect_uri: this.googleRedirUrl,
+      response_type: 'code',
+      scope: 'openid email profile',
+    });
+
+    return {
+      url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
+    };
+  }
+
+  async googleLoginCallback(code: string) {
+    try {
+      // Exchange the authorization code for an ID token using the Google API.
+      const { data } = await axios.post('https://oauth2.googleapis.com/token', {
+        code,
+        client_id: this.googleId,
+        client_secret: this.googleSecret,
+        redirect_uri: this.googleRedirUrl,
+        grant_type: 'authorization_code',
+      });
+
+      // Authenticate the user with AWS Cognito using the Google ID token.
+      const result = await this.cognito.adminInitiateAuth({
+        AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
+        ClientId: this.clientId,
+        UserPoolId: this.userPoolId,
+        AuthParameters: {
+          USERNAME: data.email, // Use the email as the username.
+          PASSWORD: 'google', // A password is required for ADMIN_USER_PASSWORD_AUTH.
+        },
+        ClientMetadata: {
+          id_token: data.id_token, // Store the ID token in the client metadata.
+        },
+      });
+
+      return { access_token: result.AuthenticationResult.AccessToken };
+    } catch (error) {
+      console.error(error);
+      throw new Error('Failed to authenticate user.');
+    }
   }
 }
